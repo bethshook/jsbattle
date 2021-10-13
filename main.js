@@ -91,23 +91,61 @@ function myTank() {
       }
     }
 
+    let allyDist = NaN
+    if (state.radar.ally) {
+      const ally = state.radar.ally
+      allyDist = Math.sqrt((ally.x - state.x) ** 2 + (ally.y - state.y) ** 2)
+
+      // Priority 1 is to avoid bumping into or shooting allies
+      if (allyDist < 2*WALL_MIN_DIST) {
+        // Back away from ally without turning
+        const allyAngle = Math.deg.atan2(ally.y - state.y, ally.x - state.x)
+        if (-90 < Math.deg.normalize(allyAngle - state.angle) < 90) {
+          throttle = -throttle
+          control.THROTTLE = throttle
+        }
+        else {
+          control.THROTTLE = throttle
+        }
+
+        return
+      }
+    }
+
+    if (state.collisions.ally) {
+      // We hit them but can't see them so try reversing
+      throttle = -throttle
+      control.THROTTLE = throttle
+
+      return
+    }
+
     if (enemy) {
       // Calculate distance and angle to enemy
       enemyDist = Math.sqrt((enemy.x - state.x) ** 2 + (enemy.y - state.y) ** 2)
 
       // We have an enemy so regardless of what we'll do,
-      // we'll always keep the radar on them, shoot and boost
+      // we'll always keep the radar on them, boost and shoot (unless an ally is closer)
       autopilot.lookAtEnemy(enemy)
       const bulletTime = enemyDist/BULLET_SPEED
       const futureEnemy = predict(enemy, bulletTime)
       turnGunToPoint(futureEnemy.x, futureEnemy.y, autopilot)
-      control.SHOOT = 0.1
       control.BOOST = 1
 
-      if (enemyDist < RAM_DIST || enemyDist > ENEMY_MAX_DIST || !autopilot.isOriginKnown()) {
-        // Priority 1 is to ram the enemy since they may be backing us into a wall
-        // Priority 2 is to pursue enemies that are far away so they don't escape
+      if (allyDist < enemyDist) {
+        // Don't shoot if an ally is in the way
+        control.SHOOT = 0
+      }
+      else {
+        // If no ally is in the way, always shoot
+        control.SHOOT = 0.1
+      }
+
+      if ((enemyDist < RAM_DIST || enemyDist > ENEMY_MAX_DIST || !autopilot.isOriginKnown())) {
+        // Priority 2 is to ram the enemy since they may be backing us into a wall
+        // Priority 3 is to pursue enemies that are far away so they don't escape
         // We always try to ram the enemy if we don't know where the walls are because it's safer
+        // Don't attempt to move forward if an ally is in the way, however...
         autopilot.turnToPoint(enemy.x, enemy.y)
         control.THROTTLE = 1
 
@@ -123,7 +161,7 @@ function myTank() {
     let wallDist = WALL_MIN_DIST
     if (avoidingWall) { wallDist = WALL_RETREAT_DIST }
 
-    // Priority 3 is to find the walls and avoid bumping into them because that hurts a lot
+    // Priority 4 is to find the walls and avoid bumping into them because that hurts a lot
     if (!autopilot.isOriginKnown()) {
       // Spin around trying to find walls
       if (state.collisions.wall) throttle = -throttle
@@ -165,7 +203,7 @@ function myTank() {
       // Angle to enemy, taken from Dodge tank code
       const enemyAngle = Math.deg.atan2(enemy.y - state.y, enemy.x - state.x)
 
-      // Priority 4 is to back away from incoming enemies
+      // Priority 5 is to back away from incoming enemies
       if (enemyDist < ENEMY_MIN_DIST) {
         // We are probably facing the enemy,
         // so keep facing them and reverse instead of turning around
@@ -173,7 +211,7 @@ function myTank() {
         control.THROTTLE = -1
       }
       else {
-        // Priority 5 is to circle around enemies at a set distance
+        // Priority 6 is to circle around enemies at a set distance
         let angle = Math.deg.normalize(enemyAngle - 90)
         autopilot.turnToAngle(angle)
         if (-90 < angle < 90) {
@@ -187,7 +225,7 @@ function myTank() {
       return
     }
 
-    // Priority 5 is to search for enemies
+    // Priority 7 is to search for enemies
     if (Math.deg.normalize(centerAngle - state.angle) > 0) {
       control.TURN = CIRCLE_TURN_RATE * throttle
     } else {
