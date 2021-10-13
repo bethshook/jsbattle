@@ -9,7 +9,6 @@ function myTank() {
   let enemy
   let enemyAge
   let enemyDist
-  let firstEnemyFound = false
   let avoidingWall = false
   let throttle = 1
   let fleeing = false
@@ -65,22 +64,18 @@ function myTank() {
     // Updates the autopilot with the current state
     autopilot.update(state, control);
 
-    if (!firstEnemyFound && state.radio.inbox.length) {
+    if (!state.radar.enemy && state.radio.inbox.length) {
       // We received an enemy's info from an allied tank
       enemy = state.radio.inbox[0];
       enemyAge = 0;
-      firstEnemyFound = true;
     } else if (state.radar.enemy) {
       // We found an enemy via the radar
       // Store them for later use and record when we last saw them
       enemy = state.radar.enemy
       enemyAge = 0
 
-      if (!firstEnemyFound) {
-        // Tell other tanks about the enemy
-        control.OUTBOX.push(enemy);
-        firstEnemyFound = true;
-      }
+      // Tell other tanks about the enemy
+      control.OUTBOX.push(enemy);
     } else {
       // We no longer see the enemy, so try to predict where they are
       enemyAge += 1
