@@ -9,6 +9,7 @@ function myTank() {
     let enemy
     let enemyAge
     let enemyDist
+    let firstEnemyFound = false
     let avoidingWall = false
     
     // Tweak these until we get good results
@@ -58,14 +59,25 @@ function myTank() {
       // Applies whatever we asked the autopilot to do
       autopilot.update(state, control);
       
-      // Detect enemy
-      if (state.radar.enemy) {
+      // Check inbox for enemy
+        if (!firstEnemyFound && state.radio.inbox.length) {
+            // We have a first enemy
+        // Store them for later use and record when we last saw them
+          enemy = state.radio.inbox[0];
+        enemyAge = 0;
+            firstEnemyFound = true;
+        // Detect enemy via radar
+      } else if (state.radar.enemy) {
         // We have an enemy
         // Store them for later use and record when we last saw them
         enemy = state.radar.enemy
         enemyAge = 0
-      }
-      else {
+        if (!firstEnemyFound) {
+          control.OUTBOX.push(enemy);
+          firstEnemyFound = true;
+        }
+        // Check inbox for enemy
+        } else {
         // We no longer see the enemy, so try to predict where they are
         enemy = predict(enemy)
         enemyAge += 1
