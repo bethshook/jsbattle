@@ -16,8 +16,8 @@ function myTank() {
   // Tweak these until we get good results
   const RAM_DIST = 50        // Ram into enemies if they somehow get this close
 
-  const ENEMY_MAX_DIST = 250 // Keep enemies closer than this
-  const ENEMY_MIN_DIST = 200 // Keep enemies farther away than this
+  const ENEMY_MAX_DIST = 200 // Keep enemies closer than this
+  const ENEMY_MIN_DIST = 150 // Keep enemies farther away than this
   const ENEMY_MAX_AGE = 50   // Ticks to try to predict enemy movement
 
   const WALL_MIN_DIST = 20     // Start avoiding wall
@@ -62,24 +62,22 @@ function myTank() {
     // Applies whatever we asked the autopilot to do
     autopilot.update(state, control);
 
-    // Check inbox for enemy
     if (!firstEnemyFound && state.radio.inbox.length) {
-      // We have a first enemy
-      // Store them for later use and record when we last saw them
+      // We received an enemy's info from an allied tank
       enemy = state.radio.inbox[0];
       enemyAge = 0;
       firstEnemyFound = true;
-      // Detect enemy via radar
     } else if (state.radar.enemy) {
-      // We have an enemy
+      // We found an enemy via the radar
       // Store them for later use and record when we last saw them
       enemy = state.radar.enemy
       enemyAge = 0
+
       if (!firstEnemyFound) {
+        // Tell other tanks about the enemy
         control.OUTBOX.push(enemy);
         firstEnemyFound = true;
       }
-      // Check inbox for enemy
     } else {
       // We no longer see the enemy, so try to predict where they are
       enemyAge += 1
@@ -102,9 +100,10 @@ function myTank() {
       control.SHOOT = 0.1
       control.BOOST = 1
 
-      if (enemyDist < RAM_DIST || enemyDist > ENEMY_MAX_DIST) {
+      if (enemyDist < RAM_DIST || enemyDist > ENEMY_MAX_DIST || !autopilot.isOriginKnown()) {
         // Priority 1 is to ram the enemy since they may be backing us into a wall
         // Priority 2 is to pursue enemies that are far away so they don't escape
+        // We always try to ram the enemy if we don't know where the walls are because it's safer
         autopilot.turnToPoint(enemy.x, enemy.y)
         control.THROTTLE = 1
 
