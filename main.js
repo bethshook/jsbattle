@@ -19,7 +19,7 @@ function myTank() {
 
   const ENEMY_MAX_DIST = 200 // Keep enemies closer than this
   const ENEMY_MIN_DIST = 150 // Keep enemies farther away than this
-  const ENEMY_MAX_AGE = 50   // Ticks to try to predict enemy movement
+  const ENEMY_MAX_AGE = 100  // Ticks to try to predict enemy movement
 
   const WALL_MIN_DIST = 20     // Start avoiding wall
   const WALL_RETREAT_DIST = 30 // Retreat to this distance from wall
@@ -193,10 +193,10 @@ function myTank() {
         let angle = Math.deg.normalize(enemyAngle - 90)
         autopilot.turnToAngle(angle)
         if (-90 < angle < 90) {
-          control.THROTTLE = 1
+          control.THROTTLE = throttle
         }
         else {
-          control.THROTTLE = -1
+          control.THROTTLE = -throttle
         }
       }
 
