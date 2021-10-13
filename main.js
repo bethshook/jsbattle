@@ -14,7 +14,7 @@ function myTank() {
   let throttle = 1
 
   // Tweak these until we get good results
-  const RAM_DIST = 50        // Ram into enemies if they somehow get this close
+  const RAM_DIST = 100 // Ram into enemies if they somehow get this close
 
   const ENEMY_MAX_DIST = 200 // Keep enemies closer than this
   const ENEMY_MIN_DIST = 150 // Keep enemies farther away than this
@@ -24,6 +24,8 @@ function myTank() {
   const WALL_RETREAT_DIST = 30 // Retreat to this distance from wall
 
   const CIRCLE_TURN_RATE = 0.3 // Used when circling around trying to find walls or enemies
+
+  const BULLET_SPEED = 4 // Used to predict where enemies will be when we shoot at them
 
   // Copied from autopilot but turns gun instead of whole tank
   function turnGunToAngle(angle, autopilot) {
@@ -54,12 +56,12 @@ function myTank() {
 
   function predict(enemy, ticks = 1) {
     // Predict where the enemy should be after a number of ticks
-    return enemy;
+    const prediction = Autopilot.extrapolatedPosition(enemy, enemy.angle, enemy.speed, ticks)
+    return Object.assign({}, enemy, prediction)
   }
 
-
   tank.loop(function (state, control) {
-    // Applies whatever we asked the autopilot to do
+    // Updates the autopilot with the current state
     autopilot.update(state, control);
 
     if (!firstEnemyFound && state.radio.inbox.length) {
@@ -95,8 +97,10 @@ function myTank() {
 
       // We have an enemy so regardless of what we'll do,
       // we'll always keep the radar on them, shoot and boost
-      turnGunToPoint(enemy.x, enemy.y, autopilot)
       autopilot.lookAtEnemy(enemy)
+      const bulletTime = enemyDist/BULLET_SPEED
+      const futureEnemy = predict(enemy, bulletTime)
+      turnGunToPoint(futureEnemy.x, futureEnemy.y, autopilot)
       control.SHOOT = 0.1
       control.BOOST = 1
 
