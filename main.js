@@ -12,6 +12,7 @@ function myTank() {
   let firstEnemyFound = false
   let avoidingWall = false
   let throttle = 1
+  let fleeing = false
 
   // Tweak these until we get good results
   const RAM_DIST = 100 // Ram into enemies if they somehow get this close
@@ -109,11 +110,26 @@ function myTank() {
         // Priority 2 is to pursue enemies that are far away so they don't escape
         // We always try to ram the enemy if we don't know where the walls are because it's safer
         autopilot.turnToPoint(enemy.x, enemy.y)
-        control.THROTTLE = 1
 
-        // Use bigger shots if ramming
         if (enemyDist < RAM_DIST) {
+          if (state.energy < 25) {
+            // Flee when below 25 energy
+            if (!fleeing) {
+              // Reverse throttle but only once
+              // If we hit a wall after this,
+              // we just ram them again because that's better than hitting the wall
+              throttle = -1
+              fleeing = true
+            }
+
+            control.THROTTLE = throttle
+          }
+
+          // Use bigger shots if ramming
           control.SHOOT = 1
+        }
+        else {
+          control.THROTTLE = 1
         }
 
         return
