@@ -11,6 +11,7 @@ function myTank() {
   let enemyDist
   let firstEnemyFound = false
   let avoidingWall = false
+  let throttle = 1
 
   // Tweak these until we get good results
   const RAM_DIST = 50        // Ram into enemies if they somehow get this close
@@ -19,8 +20,10 @@ function myTank() {
   const ENEMY_MIN_DIST = 200 // Keep enemies farther away than this
   const ENEMY_MAX_AGE = 50   // Ticks to try to predict enemy movement
 
-  const WALL_MIN_DIST = 20      // Start avoiding wall
-  const WALL_RETREAT_DIST = 50 // Retreat to this distance from wall
+  const WALL_MIN_DIST = 20     // Start avoiding wall
+  const WALL_RETREAT_DIST = 30 // Retreat to this distance from wall
+
+  const CIRCLE_TURN_RATE = 0.3 // Used when circling around trying to find walls or enemies
 
   // Copied from autopilot but turns gun instead of whole tank
   function turnGunToAngle(angle, autopilot) {
@@ -79,7 +82,6 @@ function myTank() {
       // Check inbox for enemy
     } else {
       // We no longer see the enemy, so try to predict where they are
-      enemy = predict(enemy)
       enemyAge += 1
 
       if (enemyAge <= ENEMY_MAX_AGE) {
@@ -117,47 +119,76 @@ function myTank() {
     let wallDist = WALL_MIN_DIST
     if (avoidingWall) { wallDist = WALL_RETREAT_DIST }
 
-    // Priority 3 is to avoid walls because bumping into them hurts a lot
-    if ((Math.abs(autopilot.origin.x + 425 - state.x) > 425 - wallDist || Math.abs(autopilot.origin.y + 225 - state.y) > 225 - wallDist)) {
+    // Priority 3 is to find the walls and avoid bumping into them because that hurts a lot
+    if (!autopilot.isOriginKnown()) {
+      // Spin around trying to find walls
+      if (state.collisions.wall) throttle = -throttle
+      control.TURN = CIRCLE_TURN_RATE
+      control.RADAR_TURN = 1
+      control.THROTTLE = throttle
+
+      return
+    }
+
+    // Calculate angle to center of the battlefield
+    const centerDiffY = autopilot.origin.y + Constants.BATTLEFIELD_HEIGHT/2 - state.y
+    const centerDiffX = autopilot.origin.x + Constants.BATTLEFIELD_WIDTH/2 - state.x
+    const centerAngle = Math.deg.atan2(centerDiffY, centerDiffX)
+
+    if ((Math.abs(autopilot.origin.x + Constants.BATTLEFIELD_WIDTH/2 - state.x) > Constants.BATTLEFIELD_WIDTH/2 - wallDist || Math.abs(autopilot.origin.y + Constants.BATTLEFIELD_HEIGHT/2 - state.y) > Constants.BATTLEFIELD_HEIGHT/2 - wallDist)) {
+      // We are too close to the wall so back away
+      // We are probably facing away from the middle so instead of
+      // turning towards the middle we should turn away and reverse
+      if (!avoidingWall) throttle = -throttle
       avoidingWall = true
-      // If we are hitting a wall, we are probably facing away from the middle so
-      // instead of turning towards the middle we should turn away and reverse
-      let angle = Math.deg.atan2(225 - state.y, 425 - state.x);
-      autopilot.turnToAngle(-angle)
-      control.THROTTLE = -1
-    } else {
-      avoidingWall = false
+      control.THROTTLE = throttle
 
-      if (enemy) {
-        // Angle to enemy, taken from Dodge tank code
-        const enemyAngle = Math.deg.atan2(enemy.y - state.y, enemy.x - state.x)
+      let angle = centerAngle
+      if (throttle < 0) angle = angle + 180
 
-        // Priority 4 is to back away from incoming enemies
-        if (enemyDist < ENEMY_MIN_DIST) {
-          // We are probably facing the enemy, so keep facing them and reverse instead of turning around
-          autopilot.turnToAngle(enemyAngle)
-          control.THROTTLE = -1
-        }
-        else {
-          // Priority 5 is to circle around enemies at a set distance
-          let angle = Math.deg.normalize(enemyAngle - 90)
-          autopilot.turnToAngle(angle)
-          if (angle < 90 || angle > 270) {
-            control.THROTTLE = 1
-          }
-          else {
-            control.THROTTLE = -1
-          }
-        }
+      autopilot.turnToAngle(angle)
+
+      return
+    }
+
+    // After we are done avoiding a wall, reverse circling direction to try to break free
+    avoidingWall = false
+
+    if (enemy) {
+      // Angle to enemy, taken from Dodge tank code
+      const enemyAngle = Math.deg.atan2(enemy.y - state.y, enemy.x - state.x)
+
+      // Priority 4 is to back away from incoming enemies
+      if (enemyDist < ENEMY_MIN_DIST) {
+        // We are probably facing the enemy,
+        // so keep facing them and reverse instead of turning around
+        autopilot.turnToAngle(enemyAngle)
+        control.THROTTLE = -1
       }
       else {
-        // Priority 5 is to search for enemies
-        control.TURN = 1
-        control.RADAR_TURN = 1
-        control.THROTTLE = 1
+        // Priority 5 is to circle around enemies at a set distance
+        let angle = Math.deg.normalize(enemyAngle - 90)
+        autopilot.turnToAngle(angle)
+        if (-90 < angle < 90) {
+          control.THROTTLE = 1
+        }
+        else {
+          control.THROTTLE = -1
+        }
       }
+
+      return
     }
+
+    // Priority 5 is to search for enemies
+    if (Math.deg.normalize(centerAngle - state.angle) > 0) {
+      control.TURN = CIRCLE_TURN_RATE * throttle
+    } else {
+      control.TURN = -CIRCLE_TURN_RATE * throttle
+    }
+    control.RADAR_TURN = 1
+    control.THROTTLE = throttle
   })
 
-  // YOUR CODE GOES ABOVE ^^^^^^^^ 
+  // YOUR CODE GOES ABOVE ^^^^^^^^
 }
