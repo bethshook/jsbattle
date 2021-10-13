@@ -1,0 +1,102 @@
+<!-- YOU DON'T NEED TO EDIT THIS FILE -->
+<!-- YOU DON'T NEED TO EDIT THIS FILE -->
+<!-- YOU DON'T NEED TO EDIT THIS FILE -->
+
+<body onload="bodyOnLoad()">
+    <canvas id="battlefield" style="width: 900px; height: 600px"></canvas>
+    
+    Opponent:
+    <select id="opponent">
+      <option>chicken</option>
+      <option>circler</option>
+      <option>crawler</option>
+      <option>crazy</option>
+      <option>dodge</option>
+      <option>dummy</option>
+      <option>jamro</option>
+      <option>kamikaze</option>
+      <option>sniper</option>
+    </select>
+    
+    &nbsp;&nbsp;&nbsp; Opponent Team Size:
+    <select id="opponentTeamSize">
+      <option>1</option>
+      <option>2</option>
+      <option>3</option>
+      <option>4</option>
+    </select>
+    
+    &nbsp;&nbsp;&nbsp; My Team Size:
+    <select id="myTeamSize">
+      <option>1</option>
+      <option>2</option>
+      <option>3</option>
+      <option>4</option>
+    </select>
+    
+    &nbsp;&nbsp;&nbsp; <button onclick="restartSimulation()">Restart</button>
+    <div id="data" style="margin-top: 20px"/>
+  </body>
+  
+  <script type="text/javascript">
+    var canvas = document.getElementById('battlefield');
+    var renderer = JsBattle.createRenderer('debug');
+    renderer.init(canvas);
+  
+    var simulation = JsBattle.createSimulation(renderer);
+    simulation.init(900, 600);
+    
+    var otherTeamBot = 'chicken';
+    var otherTeamSize = 1;
+    var myTeamSize = 1;
+      var myTeamName = 'us';
+  
+      function watchSelect(id, callback) {
+        const select = document.querySelector(`[id="${id}"]`);
+  
+      select.addEventListener(`change`, (e) => {
+          callback(e.target.value);
+        restartSimulation();
+      });
+    }
+  
+      function bodyOnLoad() {
+        restartSimulation();
+  
+        watchSelect('opponent', (name) => otherTeamBot = name);
+      watchSelect('opponentTeamSize', (count) => otherTeamSize = count);
+      watchSelect('myTeamSize', (count) => myTeamSize = count);
+    }
+    
+    function addTanks(count, code, teamName) {
+        for (var ii = 0; ii < count; ii++) {
+          var ai = JsBattle.createAiDefinition();
+        ai.fromCode(teamName, code);
+        ai.assignToTeam(teamName);
+        simulation.addTank(ai);
+      }
+    }
+    
+    function restartSimulation() {
+      simulation.stop();
+          renderer = JsBattle.createRenderer('debug');
+        renderer.init(canvas);
+        simulation = JsBattle.createSimulation(renderer);
+           simulation.init(900, 600);
+      
+      battlefieldData = {
+          width: simulation.battlefield._width,
+        height: simulation.battlefield._height,
+        origin: { x: simulation.battlefield.minX, y: simulation.battlefield.minY }
+      };
+      document.getElementById("data").innerHTML = "Battlefield: " + JSON.stringify(battlefieldData);
+      
+      var myCode = `${myTank.toString()}; myTank();`;
+      
+        addTanks(myTeamSize, myCode, myTeamName);
+      addTanks(otherTeamSize, bots[otherTeamBot], otherTeamBot);
+      
+      simulation.start();
+    }
+  </script>
+  
