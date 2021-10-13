@@ -95,7 +95,8 @@ function myTank() {
       // Calculate distance and angle to enemy
       enemyDist = Math.sqrt((enemy.x - state.x) ** 2 + (enemy.y - state.y) ** 2)
 
-      // We have an enemy so regardless of what we'll do, we'll always keep the radar on them, shoot and boost
+      // We have an enemy so regardless of what we'll do,
+      // we'll always keep the radar on them, shoot and boost
       turnGunToPoint(enemy.x, enemy.y, autopilot)
       autopilot.lookAtEnemy(enemy)
       control.SHOOT = 0.1
@@ -135,7 +136,10 @@ function myTank() {
     const centerDiffX = autopilot.origin.x + Constants.BATTLEFIELD_WIDTH/2 - state.x
     const centerAngle = Math.deg.atan2(centerDiffY, centerDiffX)
 
-    if ((Math.abs(autopilot.origin.x + Constants.BATTLEFIELD_WIDTH/2 - state.x) > Constants.BATTLEFIELD_WIDTH/2 - wallDist || Math.abs(autopilot.origin.y + Constants.BATTLEFIELD_HEIGHT/2 - state.y) > Constants.BATTLEFIELD_HEIGHT/2 - wallDist)) {
+    if (
+      Math.abs(centerDiffX) > Constants.BATTLEFIELD_WIDTH/2 - wallDist ||
+      Math.abs(centerDiffY) > Constants.BATTLEFIELD_HEIGHT/2 - wallDist
+    ) {
       // We are too close to the wall so back away
       // We are probably facing away from the middle so instead of
       // turning towards the middle we should turn away and reverse
