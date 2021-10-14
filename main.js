@@ -1,5 +1,4 @@
 function myTank() {
-  // YOUR CODE GOES BELOW vvvvvvvv
   class AdvancedState { constructor(t) { this.state = t, this.absoluteRadarAngle = Math.deg.normalize(this.state.radar.angle + this.state.angle), this.position = { x: t.x, y: t.y } } orientationString() { return `${this.state.x}${this.state.y}${this.state.angle}${this.state.radar.angle}` } getPointAtDistanceAlongRadar(t) { return { x: this.state.x + Math.cos(this.absoluteRadarAngle * Math.PI / 180) * t, y: this.state.y + Math.sin(this.absoluteRadarAngle * Math.PI / 180) * t } } } const BATTLEFIELD_WIDTH = 850, BATTLEFIELD_HEIGHT = 550, SOUTH = 90, NORTH = -90, WEST = -180, EAST = 0, TANK_WIDTH = 36; var Constants = Object.freeze({ __proto__: null, BATTLEFIELD_WIDTH: BATTLEFIELD_WIDTH, BATTLEFIELD_HEIGHT: BATTLEFIELD_HEIGHT, SOUTH: SOUTH, NORTH: NORTH, WEST: WEST, EAST: EAST, TANK_WIDTH: TANK_WIDTH }); Number.prototype.isWhole = function (t = 1e-8) { return Math.abs(Math.round(this) - this) < t }; class OriginFinder { constructor() { this.origin = { x: void 0, y: void 0 }, this.lastX = void 0, this.lastY = void 0, this.lastOrientation = void 0 } update(i) { if (!this.origin.x || !this.origin.y) { var s = i.state.radar.wallDistance; if (s) { var o = this.lastOrientation && this.lastOrientation != i.orientationString(); this.lastOrientation = i.orientationString(); let t = i.getPointAtDistanceAlongRadar(s); !this.origin.x && t.x.isWhole() && (this.lastX && this.lastX == Math.round(t.x) && o && (this.origin.x = this.lastX - (90 <= Math.abs(i.absoluteRadarAngle) ? 0 : BATTLEFIELD_WIDTH)), this.lastX = Math.round(t.x)), !this.origin.y && t.y.isWhole() && (this.lastY && this.lastY == Math.round(t.y) && o && (this.origin.y = this.lastY - (0 < i.absoluteRadarAngle ? BATTLEFIELD_HEIGHT : 0)), this.lastY = Math.round(t.y)) } } } } class Autopilot { constructor() { this.originFinder = new OriginFinder, this.origin = this.originFinder.origin, this.advancedState = void 0, this.path = [], this.nextPosition = void 0 } update(t, i) { this.state = t, this.advancedState = new AdvancedState(t), this.control = i, this.originFinder.update(this.advancedState) } isOriginKnown() { return this.origin.x && this.origin.y } setOrigin(t, i) { this.origin.x = t, this.origin.y = i } lookEverywhere() { this.control.RADAR_TURN = 1 } lookAtEnemy(t) { t = Math.deg.atan2(t.y - this.state.y, t.x - this.state.x), t = Math.deg.normalize(t - this.state.angle), t = Math.deg.normalize(t - this.state.radar.angle); this.control.RADAR_TURN = t } isWallCollisionImminent(t = 3) { if (this.state.collisions.wall) return !0; if (this.isOriginKnown()) { t = this.extrapolatedOuterPosition(t); return t.x <= this.origin.x || t.x >= this.origin.x + BATTLEFIELD_WIDTH || t.y <= this.origin.y || t.y >= this.origin.y + BATTLEFIELD_HEIGHT } } turnToAngle(t) { if (t = Math.deg.normalize(t), this.state.angle == t) return this.control.TURN = 0; t = Math.deg.normalize(t - this.state.angle); return this.control.TURN = t / 2, t } turnToPoint(t, i, s = !1) { if (!this.isOriginKnown() && s) throw new "Cannot turn to point based on zero origin because the origin is not yet known"; t += s ? this.origin.x : 0, s = i + (s ? this.origin.y : 0), t = Math.deg.atan2(s - this.state.y, t - this.state.x); return this.turnToAngle(t) } moveToPoint(t, i, s = !1) { this.control.THROTTLE = 0; s = this.turnToPoint(t, i, s); s < 60 && (this.control.THROTTLE = (60 - s) / 60) } moveAlongAngle(t) { this.control.THROTTLE = 0; t = Math.abs(this.turnToAngle(t)); t < 60 && (this.control.THROTTLE = (60 - t) / 60) } loopOnPath(t, i, s = 50) { if (0 != t.length) { if (0 == this.path.length && (this.path = t, i)) { if (!this.isOriginKnown()) throw new "Cannot loop on positions based on zero origin because the origin is not yet known"; this.path.forEach(t => { t.x += this.origin.x, t.y += this.origin.y }) } this.nextPosition || (this.nextPosition = this.path.shift(), this.path.push(this.nextPosition)), Math.distance(this.nextPosition.x, this.nextPosition.y, this.state.x, this.state.y) <= s && (this.nextPosition = this.path.shift(), this.path.push(this.nextPosition)), this.moveToPoint(this.nextPosition.x, this.nextPosition.y) } } stopLoopOnPath() { this.path = [], this.nextPosition = void 0, this.stop() } stop() { this.control.TURN = 0, this.control.THROTTLE = 0, this.control.BOOST = 0 } shootEnemy(t) { var i; t && (i = Math.distance(this.state.x, this.state.y, t.x, t.y) / 4, i = Autopilot.extrapolatedPosition(t, t.angle, t.speed, i), i = Math.deg.atan2(i.y - this.state.y, i.x - this.state.x), i = Math.deg.normalize(i - this.state.angle), i = Math.deg.normalize(i - this.state.gun.angle), this.control.GUN_TURN = .3 * i, Math.abs(i) < 2 && (this.control.SHOOT = .1)) } extrapolatedPosition(t) { return Autopilot.extrapolatedPosition(this.advancedState.position, this.state.angle, this.speed(), t) } extrapolatedOuterPosition(t) { t = this.extrapolatedPosition(t); return { x: t.x + Math.sqrt(2) * TANK_WIDTH / 2 * (90 <= Math.abs(this.state.angle) ? -1 : 1), y: t.y + Math.sqrt(2) * TANK_WIDTH / 2 * (this.state.angle < 0 ? -1 : 1) } } speed() { return 2 * this.control.THROTTLE * (1 == this.control.BOOST ? 2 : 1) } static extrapolatedPosition(t, i, s, o) { return { x: t.x + o * s * Math.cos(Math.deg2rad(i)), y: t.y + o * s * Math.sin(Math.deg2rad(i)) } } }
 
   tank.init(function (settings, info) {
@@ -9,14 +8,13 @@ function myTank() {
   let enemy
   let enemyAge
   let enemyDist
-  let firstEnemyFound = false
   let avoidingWall = false
   let throttle = 1
   let fleeing = false
   let bullet
 
   // Tweak these until we get good results
-  const RAM_DIST = 100 // Ram into enemies if they somehow get this close
+  const RAM_DIST = 140 // Ram into enemies if they somehow get this close
 
   const ENEMY_MAX_DIST = 200 // Keep enemies closer than this
   const ENEMY_MIN_DIST = 150 // Keep enemies farther away than this
@@ -69,22 +67,18 @@ function myTank() {
     // Updates the autopilot with the current state
     autopilot.update(state, control);
 
-    if (!firstEnemyFound && state.radio.inbox.length) {
+    if (!state.radar.enemy && state.radio.inbox.length) {
       // We received an enemy's info from an allied tank
       enemy = state.radio.inbox[0];
-      enemyAge = 0;
-      firstEnemyFound = true;
+      enemyAge = 1;
     } else if (state.radar.enemy) {
       // We found an enemy via the radar
       // Store them for later use and record when we last saw them
-      enemy = state.radar.enemy
+      enemy = state.radar.enemy // shd we predict here??
       enemyAge = 0
 
-      if (!firstEnemyFound) {
-        // Tell other tanks about the enemy
-        control.OUTBOX.push(enemy);
-        firstEnemyFound = true;
-      }
+      // Tell other tanks about the enemy
+      control.OUTBOX.push(enemy);
     } else {
       // We no longer see the enemy, so try to predict where they are
       enemyAge += 1
@@ -102,7 +96,7 @@ function myTank() {
       allyDist = Math.sqrt((ally.x - state.x) ** 2 + (ally.y - state.y) ** 2)
 
       // Priority 1 is to avoid bumping into or shooting allies
-      if (allyDist < 2*WALL_MIN_DIST) {
+      if (allyDist < 2 * WALL_MIN_DIST) {
         // Back away from ally without turning
         const allyAngle = Math.deg.atan2(ally.y - state.y, ally.x - state.x)
         if (-90 < Math.deg.normalize(allyAngle - state.angle) < 90) {
@@ -132,7 +126,7 @@ function myTank() {
       // We have an enemy so regardless of what we'll do,
       // we'll always keep the radar on them, boost and shoot (unless an ally is closer)
       autopilot.lookAtEnemy(enemy)
-      const bulletTime = enemyDist/BULLET_SPEED
+      const bulletTime = enemyDist / BULLET_SPEED
       const futureEnemy = predict(enemy, bulletTime)
       turnGunToPoint(futureEnemy.x, futureEnemy.y, autopilot)
       control.BOOST = 1
@@ -195,13 +189,13 @@ function myTank() {
     }
 
     // Calculate angle to center of the battlefield
-    const centerDiffY = autopilot.origin.y + Constants.BATTLEFIELD_HEIGHT/2 - state.y
-    const centerDiffX = autopilot.origin.x + Constants.BATTLEFIELD_WIDTH/2 - state.x
+    const centerDiffY = autopilot.origin.y + Constants.BATTLEFIELD_HEIGHT / 2 - state.y
+    const centerDiffX = autopilot.origin.x + Constants.BATTLEFIELD_WIDTH / 2 - state.x
     const centerAngle = Math.deg.atan2(centerDiffY, centerDiffX)
 
     if (
-      Math.abs(centerDiffX) > Constants.BATTLEFIELD_WIDTH/2 - wallDist ||
-      Math.abs(centerDiffY) > Constants.BATTLEFIELD_HEIGHT/2 - wallDist
+      Math.abs(centerDiffX) > Constants.BATTLEFIELD_WIDTH / 2 - wallDist ||
+      Math.abs(centerDiffY) > Constants.BATTLEFIELD_HEIGHT / 2 - wallDist
     ) {
       // We are too close to the wall so back away
       // We are probably facing away from the middle so instead of
@@ -284,6 +278,4 @@ function myTank() {
     control.RADAR_TURN = 1
     control.THROTTLE = throttle
   })
-
-  // YOUR CODE GOES ABOVE ^^^^^^^^
 }
