@@ -70,7 +70,7 @@ function myTank() {
     if (!state.radar.enemy && state.radio.inbox.length) {
       // We received an enemy's info from an allied tank
       enemy = state.radio.inbox[0];
-      enemyAge = 0;
+      enemyAge = 1;
     } else if (state.radar.enemy) {
       // We found an enemy via the radar
       // Store them for later use and record when we last saw them
