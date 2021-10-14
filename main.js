@@ -11,6 +11,7 @@ function myTank() {
   let avoidingWall = false
   let throttle = 1
   let fleeing = false
+  let bullet
 
   // Tweak these until we get good results
   const RAM_DIST = 140 // Ram into enemies if they somehow get this close
@@ -25,6 +26,9 @@ function myTank() {
   const CIRCLE_TURN_RATE = 0.3 // Used when circling around trying to find walls or enemies
 
   const BULLET_SPEED = 4 // Used to predict where enemies will be when we shoot at them
+
+  const MIN_BULLET_DAMAGE_TO_DODGE = 5 // Only try to dodge bullets that deal at least this much damage
+  const BULLET_MAX_AGE = 50            // Try to dodge bullets for this long
 
   // Copied from autopilot but turns gun instead of whole tank
   function turnGunToAngle(angle, autopilot) {
@@ -136,9 +140,10 @@ function myTank() {
         control.SHOOT = 0.1
       }
 
-      if ((enemyDist < RAM_DIST || enemyDist > ENEMY_MAX_DIST || !autopilot.isOriginKnown())) {
+      if (!autopilot.isOriginKnown() || enemyDist < RAM_DIST || (enemyDist > ENEMY_MAX_DIST && (!bullet || bullet.age > BULLET_MAX_AGE))) {
         // Priority 2 is to ram the enemy since they may be backing us into a wall
-        // Priority 3 is to pursue enemies that are far away so they don't escape
+        // Priority 3 is to pursue enemies that are far away so they don't escape,
+        // but only if there is not an incoming bullet
         // We always try to ram the enemy if we don't know where the walls are because it's safer
         // Don't attempt to move forward if an ally is in the way, however...
         autopilot.turnToPoint(enemy.x, enemy.y)
@@ -154,6 +159,7 @@ function myTank() {
               fleeing = true
             }
 
+            if (state.collisions.wall) throttle = -throttle
             control.THROTTLE = throttle
           }
 
@@ -209,11 +215,38 @@ function myTank() {
     // After we are done avoiding a wall, reverse circling direction to try to break free
     avoidingWall = false
 
+    // Priority 5 is to dodge bullets
+    for (const blt of state.radar.bullets) {
+      if (blt.damage > MIN_BULLET_DAMAGE_TO_DODGE) {
+        bullet = blt
+        bullet.age = 0
+        break
+      }
+    }
+
+    if (bullet && bullet.age <= BULLET_MAX_AGE) {
+      bullet = predict(bullet)
+      bullet.age += 1
+
+      const bulletAngle = Math.deg.atan2(bullet.y - state.y, bullet.x - state.x)
+      const turnAngle = Math.deg.normalize(bulletAngle - 90)
+      autopilot.turnToAngle(turnAngle)
+      if (-90 < Math.deg.normalize(state.angle - bullet.angle) < 90) {
+        // We are heading the same way the bullet is, so back away
+        control.THROTTLE = -1
+      } else {
+        // We are heading the opposite way
+        control.THROTTLE = 1
+      }
+
+      return
+    }
+
     if (enemy) {
       // Angle to enemy, taken from Dodge tank code
       const enemyAngle = Math.deg.atan2(enemy.y - state.y, enemy.x - state.x)
 
-      // Priority 5 is to back away from incoming enemies
+      // Priority 6 is to back away from incoming enemies
       if (enemyDist < ENEMY_MIN_DIST) {
         // We are probably facing the enemy,
         // so keep facing them and reverse instead of turning around
@@ -221,10 +254,11 @@ function myTank() {
         control.THROTTLE = -1
       }
       else {
-        // Priority 6 is to circle around enemies at a set distance
-        let angle = Math.deg.normalize(enemyAngle - 90)
-        autopilot.turnToAngle(angle)
-        if (-90 < angle < 90) {
+        // Priority 7 is to circle around enemies at a set distance
+        const turnAngle = Math.deg.normalize(enemyAngle - 90)
+        autopilot.turnToAngle(turnAngle)
+        control.THROTTLE = throttle
+        if (-90 < Math.deg.normalize(state.angle - turnAngle) < 90) {
           control.THROTTLE = throttle
         }
         else {
@@ -235,7 +269,7 @@ function myTank() {
       return
     }
 
-    // Priority 7 is to search for enemies
+    // Priority 8 is to search for enemies
     if (Math.deg.normalize(centerAngle - state.angle) > 0) {
       control.TURN = CIRCLE_TURN_RATE * throttle
     } else {
